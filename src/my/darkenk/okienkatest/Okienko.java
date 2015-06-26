@@ -31,6 +31,7 @@ package my.darkenk.okienkatest;
 
 import android.content.Context;
 import android.content.Intent;
+import android.view.InputEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -119,6 +120,10 @@ public class Okienko extends RelativeLayout {
         }
 
         protected abstract void onMove(float dx, float dy);
+    }
+
+    public boolean injectInputEvent(InputEvent e) {
+        return mActivityViewWrapper.injectInputEvent(e);
     }
 
 }
