@@ -1,36 +1,9 @@
-/**
- * Copyright (C) 2014, Dariusz Kluska <darkenk@gmail.com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *  * Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- *
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- *  * Neither the name of the {organization} nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 package my.darkenk.okienkatest;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Rect;
+import android.util.Log;
 import android.view.InputEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -52,12 +25,13 @@ public class Okienko extends RelativeLayout {
      * @param root parent of component
      * @param intent activity to start in Okienko
      */
-    public Okienko(Context context, ViewGroup root, final Intent intent) {
+    public Okienko(Context context, ViewGroup root, View resizeFrame, final Intent intent) {
         super(context);
         LayoutInflater inflater = (LayoutInflater) context.getSystemService( Context.LAYOUT_INFLATER_SERVICE );
         mWindow = (ViewGroup)inflater.inflate(R.layout.okienko_layout, root).findViewById(R.id.okienko_root);
         mWindow.setId(View.generateViewId());
         mActivityViewWrapper = new ActivityViewWrapper(context);
+
         ((ViewGroup)mWindow.findViewById(R.id.activity)).addView(mActivityViewWrapper.getActivityView());
 
         mHeader = mWindow.findViewById(R.id.header);
@@ -65,31 +39,33 @@ public class Okienko extends RelativeLayout {
 
             @Override
             protected void onMove(float dx, float dy) {
+                mWindow.bringToFront();
                 mWindow.setX(mWindow.getX() + dx);
                 mWindow.setY(mWindow.getY() + dy);
             }
         });
         mRightCorner = mWindow.findViewById(R.id.right_corner);
-        mRightCorner.setOnTouchListener(new TouchMoveListener() {
+        mRightCorner.setOnTouchListener(new ResizeListener(resizeFrame, mWindow) {
 
             @Override
             protected void onMove(float dx, float dy) {
-                ViewGroup.LayoutParams lp = mWindow.getLayoutParams();
+                ViewGroup.LayoutParams lp = mResizeFrame.getLayoutParams();
                 lp.width += dx;
                 lp.height += dy;
-                mWindow.setLayoutParams(lp);
+                mResizeFrame.setLayoutParams(lp);
             }
+
         });
         mLeftCorner = mWindow.findViewById(R.id.left_corner);
-        mLeftCorner.setOnTouchListener(new TouchMoveListener() {
+        mLeftCorner.setOnTouchListener(new ResizeListener(resizeFrame, mWindow) {
 
             @Override
             protected void onMove(float dx, float dy) {
-                mWindow.setX(mWindow.getX() + dx);
-                ViewGroup.LayoutParams lp = mWindow.getLayoutParams();
+                mResizeFrame.setX(mResizeFrame.getX() + dx);
+                ViewGroup.LayoutParams lp = mResizeFrame.getLayoutParams();
                 lp.width -= dx;
                 lp.height += dy;
-                mWindow.setLayoutParams(lp);
+                mResizeFrame.setLayoutParams(lp);
             }
         });
         this.post(new Runnable() {
@@ -100,26 +76,37 @@ public class Okienko extends RelativeLayout {
         });
     }
 
-    private abstract class TouchMoveListener implements OnTouchListener {
+    private class ResizeListener extends TouchMoveListener {
 
-        private float mLastX, mLastY;
+        protected View mResizeFrame;
+        protected ViewGroup mWindow;
 
-        @Override
-        public boolean onTouch(View v, MotionEvent e) {
-            if (e.getAction() == MotionEvent.ACTION_DOWN) {
-                mLastX = e.getRawX();
-                mLastY = e.getRawY();
-            } else if (e.getAction() == MotionEvent.ACTION_MOVE) {
-                onMove(e.getRawX() - mLastX, e.getRawY() - mLastY);
-                mLastX = e.getRawX();
-                mLastY = e.getRawY();
-            } else if (e.getAction() == MotionEvent.ACTION_UP) {
-                mLastX = mLastY = 0f;
-            }
-            return true;
+        public ResizeListener(View resizeFrame, ViewGroup window) {
+            mResizeFrame = resizeFrame;
+            mWindow = window;
         }
 
-        protected abstract void onMove(float dx, float dy);
+        @Override
+        protected void onStartMove() {
+            mResizeFrame.bringToFront();
+            ViewGroup.LayoutParams lp = mResizeFrame.getLayoutParams();
+            lp.width = mWindow.getLayoutParams().width;
+            lp.height = mWindow.getLayoutParams().height;
+            mResizeFrame.setLayoutParams(lp);
+            mResizeFrame.setX(mWindow.getX());
+            mResizeFrame.setY(mWindow.getY());
+            mResizeFrame.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        protected void onEndMove(float dx, float dy) {
+            mWindow.setX(mResizeFrame.getX());
+            ViewGroup.LayoutParams lp = mWindow.getLayoutParams();
+            lp.width = mResizeFrame.getLayoutParams().width;
+            lp.height = mResizeFrame.getLayoutParams().height;
+            mWindow.setLayoutParams(lp);
+            mResizeFrame.setVisibility(View.INVISIBLE);
+        }
     }
 
     public boolean injectInputEvent(InputEvent e) {
